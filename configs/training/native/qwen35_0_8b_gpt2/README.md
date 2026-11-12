@@ -14,6 +14,7 @@ The README at the repository root lists which file trains which method.
 | `ruler` | the 13 RULER tasks at 4,096, 8,192 and 16,384 tokens |
 | `ruler-4k` | the same 13 at 4,096 tokens, the paper's RULER column |
 | `ruler-32k` | the same 13 at 32,768, past the length the models trained at |
+| `ruler-64k`, `ruler-128k` | the same 13 at 65,536 and 131,072, the length the released 128k decays finished at |
 
 A RULER cell is also a task of its own, `ruler_<task>_<length>`, for example `ruler_niah_single_3_4096`.
 The 13 tasks are `niah_single_1`, `niah_single_2`, `niah_single_3`, `niah_multikey_1`, `niah_multikey_2`, `niah_multikey_3`, `niah_multiquery`, `niah_multivalue`, `vt`, `cwe`, `fwe`, `qa_hotpot` and `qa_squad`, 100 documents each.
@@ -57,6 +58,30 @@ The paper reports 52.2 for the mean of the 13 tasks.
 The released `decay128k-lsa-2048` scores 52.5 here, graded as the paper graded it, and 52.8 with any reference counting for the QA tasks.
 A cell holds 100 documents, so its standard error is up to 5 points, and only the mean is worth comparing.
 The preset is the run's folder name, so it stays short: a run is filed under the `--tasks` value as typed, and a list of the 13 cells spelled out is over the 255 characters a file name holds.
+
+## Reading at Another top_k
+
+The released N-LSA checkpoints were each trained at one `top_k`, and `top_k` is a read-time size, so a checkpoint can be read at others.
+`sweep_released_lsa_k{1024,2048,4096}.yaml` read one checkpoint at 256 to 8,192 keys, and the dense checkpoint is scored once.
+
+```bash
+for k in 1024 2048 4096; do
+  lsa --site mycluster native evaluate configs/training/native/qwen35_0_8b_gpt2/sweep_released_lsa_k$k.yaml \
+    --suite benchmark --tasks ruler-4k --gpus 1
+done
+lsa --site mycluster native evaluate configs/training/native/qwen35_0_8b_gpt2/evaluate_released_dense.yaml \
+  --suite benchmark --tasks ruler-4k --gpus 1
+lsa native curve $LSA_ROOT/training/native/benchmark --preset ruler-4k --baseline decay128k-dense
+```
+
+A sweep submits one job per point and files each under its run name, such as `released-decay128k-lsa-2048_top_k512`, so `--label` is refused.
+`top_p` stays unset, so every point selects twice the buckets its keys fill, 64 buckets at 256 keys and 2,048 at 8,192.
+`lsa native curve` writes `top_k_ruler-4k.png` beside the records, one line a checkpoint named for the `top_k` it trained at, and the dense checkpoint as a dashed line.
+It needs matplotlib, which the `analysis` dependency group carries.
+
+A `ruler-4k` prompt is 4,096 keys, so past about 3,580 long-range keys its last query already reads every key and the points at 4,096 and 8,192 coincide.
+The released checkpoints finished a 131,072-token decay, so the long presets are the ones where a budget of 256 to 8,192 keys binds.
+Prepare their files with `lsa native prepare-ruler --lengths 32768 65536 131072` and swap `--tasks ruler-4k` for `ruler-32k`, `ruler-64k` or `ruler-128k`, and `--preset` of `lsa native curve` the same.
 
 ## Not provided
 

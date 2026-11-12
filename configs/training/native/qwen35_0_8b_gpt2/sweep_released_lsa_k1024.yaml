@@ -1,0 +1,8 @@
+# The paper's N-LSA 128k decay trained at 1,024 long-range keys, read at a sweep of them.
+# `top_p` is left unset, so each point selects twice the buckets its keys fill.
+defaults:
+  - evaluate_released_lsa_k1024
+  - _self_
+
+sweep:
+  attention.top_k: [256, 512, 1024, 2048, 4096, 8192]

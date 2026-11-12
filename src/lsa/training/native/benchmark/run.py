@@ -435,10 +435,13 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def command(args: argparse.Namespace) -> None:
-    """Submit the benchmark a parsed command line describes.
+    """Submit the benchmark a parsed command line describes, one job per point of the config's sweep.
 
     Args:
         args: The parsed arguments of `add_arguments`.
+
+    Raises:
+        ValueError: `--label` names one label for a config that sweeps.
     """
     require_extra("omegaconf", "hydra")
 
@@ -447,12 +450,13 @@ def command(args: argparse.Namespace) -> None:
     parameters = {**PARAMETERS, **slurm.overrides(args)}
     ranks = parameters["gpus_per_node"] * parameters["nodes"]
     # A replica on every rank, then the user's own overrides
-    [experiment] = load(args.config, ["run.dp_shard=1", f"run.dp_replicate={ranks}", *args.overrides])
+    experiments = load(args.config, ["run.dp_shard=1", f"run.dp_replicate={ranks}", *args.overrides])
+    if len(experiments) > 1 and args.label:
+        raise ValueError(
+            f"--label {args.label} would file {len(experiments)} sweep points under one name - "
+            "leave it out and each point is filed under its run name"
+        )
     names = tasks.expand(args.tasks)
-    if any(tasks.is_ruler(name) for name in names):
-        tasks.check_ruler_tokenizer(names, experiment.tokenizer)
-    checkpoint = experiment.scored_checkpoint(args.checkpoint)
-    label = args.label or default_label(checkpoint)
     records_root = args.records or str(paths.training() / RECORDS)
     extra = {
         "limit": args.limit,
@@ -460,13 +464,19 @@ def command(args: argparse.Namespace) -> None:
         "batch_tokens": args.batch_tokens,
         "max_gen_toks": args.max_gen_toks,
     }
-    print(
-        f"{label}: step {step_of(checkpoint)}, {experiment.attention.kind}, tasks {args.tasks}, records {records_root}",
-        flush=True,
-    )
-    if args.dry_run:
+    for experiment in experiments:
+        if any(tasks.is_ruler(name) for name in names):
+            tasks.check_ruler_tokenizer(names, experiment.tokenizer)
+        checkpoint = experiment.scored_checkpoint(args.checkpoint)
+        label = experiment.run.name if len(experiments) > 1 else args.label or default_label(checkpoint)
         print(
-            f"{label}: would submit {Benchmark.JOB_NAME} of {len(names)} tasks with {parameters}", flush=True
+            f"{label}: step {step_of(checkpoint)}, {experiment.attention.kind}, tasks {args.tasks}, records {records_root}",
+            flush=True,
         )
-        return
-    submit(experiment, checkpoint, args.tasks, label, records_root, extra, parameters, args.folder)
+        if args.dry_run:
+            print(
+                f"{label}: would submit {Benchmark.JOB_NAME} of {len(names)} tasks with {parameters}",
+                flush=True,
+            )
+            continue
+        submit(experiment, checkpoint, args.tasks, label, records_root, extra, parameters, args.folder)

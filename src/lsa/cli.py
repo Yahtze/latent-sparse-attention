@@ -101,6 +101,10 @@ COMMANDS: Commands = {
         "report": Command(
             "lsa.training.native.benchmark.report", "pair the methods of benchmark records, with an interval"
         ),
+        "curve": Command(
+            "lsa.training.native.benchmark.curve",
+            "plot a preset's accuracy against the top_k read at inference",
+        ),
     },
     "probe": Command("lsa.evaluation.adapter.probe", "screen a checkpoint before running anything on it"),
     "data": {

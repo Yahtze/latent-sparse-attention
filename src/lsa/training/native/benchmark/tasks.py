@@ -97,6 +97,8 @@ PRESETS: dict[str, list[str]] = {
     "ruler-4k": ruler_cells((4096,)),
     # Opt-in: the models never trained at this length
     "ruler-32k": ruler_cells(EXTRAPOLATED_LENGTHS),
+    "ruler-64k": ruler_cells((65536,)),
+    "ruler-128k": ruler_cells((131072,)),
 }
 
 
