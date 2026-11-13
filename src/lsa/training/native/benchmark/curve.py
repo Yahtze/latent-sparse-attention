@@ -1,6 +1,6 @@
-"""Plot a preset's accuracy against the long-range keys a checkpoint reads at inference.
+"""Plot each preset's accuracy against the long-range keys a checkpoint reads at inference.
 
-    lsa native curve <records> --preset ruler-4k --baseline decay128k-dense
+    lsa native curve <records> --presets ruler-32k,ruler-64k,ruler-128k --baseline decay128k-dense
 
 Each N-LSA checkpoint is one line, trained at one `top_k` and read at several, with a ring on the point it trained at.
 The dense checkpoint is a flat line.
@@ -156,19 +156,28 @@ def render(
 
 
 def main() -> None:
-    """Print the points of a preset and write the plot."""
+    """Print the points of each preset and write one plot a preset."""
     parser = argparse.ArgumentParser(description="Plot accuracy against the top_k read at inference")
     parser.add_argument("records", help="the records root")
-    parser.add_argument("--preset", default="ruler-4k", help="the preset to plot")
+    parser.add_argument(
+        "--presets", default="ruler-4k", help="presets to plot, comma-separated, one figure each"
+    )
     parser.add_argument("--baseline", default="decay128k-dense", help="the label of the dense run")
     parser.add_argument(
-        "--out", default=None, help="the image - top_k_<preset>.png in the records root by default"
+        "--out-dir", default=None, help="where top_k_<preset>.png go - the records root by default"
     )
     args = parser.parse_args()
-    lines, dense = collect(args.records, args.preset, args.baseline)
-    if not lines:
-        raise SystemExit(f"{args.records} holds no N-LSA records of {args.preset}")
-    print(table(lines, dense))
-    out = Path(args.out) if args.out else Path(args.records) / f"top_k_{args.preset}.png"
-    render(lines, dense, args.preset, args.baseline, out)
-    print(f"wrote {out}")
+    out_dir = Path(args.out_dir) if args.out_dir else Path(args.records)
+    written = 0
+    for preset in args.presets.split(","):
+        lines, dense = collect(args.records, preset, args.baseline)
+        if not lines:
+            print(f"{preset}: no N-LSA records in {args.records}")
+            continue
+        print(f"{preset}\n{table(lines, dense)}")
+        out = out_dir / f"top_k_{preset}.png"
+        render(lines, dense, preset, args.baseline, out)
+        print(f"wrote {out}")
+        written += 1
+    if not written:
+        raise SystemExit(f"{args.records} holds no N-LSA records of {args.presets}")

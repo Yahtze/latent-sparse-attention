@@ -71,17 +71,18 @@ for k in 1024 2048 4096; do
 done
 lsa --site mycluster native evaluate configs/training/native/qwen35_0_8b_gpt2/evaluate_released_dense.yaml \
   --suite benchmark --tasks ruler-4k --gpus 1
-lsa native curve $LSA_ROOT/training/native/benchmark --preset ruler-4k --baseline decay128k-dense
+lsa native curve $LSA_ROOT/training/native/benchmark --presets ruler-4k --baseline decay128k-dense
 ```
 
 A sweep submits one job per point and files each under its run name, such as `released-decay128k-lsa-2048_top_k512`, so `--label` is refused.
 `top_p` stays unset, so every point selects twice the buckets its keys fill, 64 buckets at 256 keys and 2,048 at 8,192.
-`lsa native curve` writes `top_k_ruler-4k.png` beside the records, one line a checkpoint named for the `top_k` it trained at, and the dense checkpoint as a dashed line.
+`lsa native curve` writes one figure for each of `--presets`, as `top_k_<preset>.png` beside the records.
+A figure has one line for each checkpoint, named for the `top_k` it trained at and ringed at that point, and the dense checkpoint as a dashed line.
 It needs matplotlib, which the `analysis` dependency group carries.
 
 A `ruler-4k` prompt is 4,096 keys, so past about 3,580 long-range keys its last query already reads every key and the points at 4,096 and 8,192 coincide.
 The released checkpoints finished a 131,072-token decay, so the long presets are the ones where a budget of 256 to 8,192 keys binds.
-Prepare their files with `lsa native prepare-ruler --lengths 32768 65536 131072` and swap `--tasks ruler-4k` for `ruler-32k`, `ruler-64k` or `ruler-128k`, and `--preset` of `lsa native curve` the same.
+Prepare their files with `lsa native prepare-ruler --lengths 32768 65536 131072` and swap `--tasks ruler-4k` for `ruler-32k`, `ruler-64k` or `ruler-128k`, and list them in `--presets` of `lsa native curve`, which draws a figure for each.
 
 ## Not provided
 
